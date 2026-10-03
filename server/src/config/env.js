@@ -18,8 +18,13 @@ const optionalString = z.preprocess(
   z.string().trim().optional()
 );
 
+const emptyToUndefined = (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value);
+
 const nodeEnv = process.env.NODE_ENV || 'development';
 const isProd = nodeEnv === 'production';
+
+/** This project's deployed frontend (Vercel production domain). Not a secret. */
+const PRODUCTION_CLIENT_URL = 'https://real-time-chat-collaboration-applic.vercel.app';
 
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
@@ -34,13 +39,14 @@ const schema = z.object({
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(7),
   REFRESH_REUSE_GRACE_SECONDS: z.coerce.number().int().min(0).max(120).default(15),
 
-  CLIENT_URL: z.string().url().default('http://localhost:5173'),
+  CLIENT_URL: z.preprocess(emptyToUndefined, z.string().url().default(isProd ? PRODUCTION_CLIENT_URL : 'http://localhost:5173')),
   CORS_ORIGINS: z.string().default(''),
-  // Wildcard origins ("*" matches letters, digits and dashes — never a dot). The default accepts
-  // this project's Vercel production, preview and deployment URLs. Set to "none" to disable.
+  // Allowed frontend origins, comma separated. An entry without "*" must match exactly; "*" matches
+  // letters, digits and dashes (never a dot). The default allows this project's Vercel production
+  // domain exactly, plus its deployment/preview URLs. Set to "none" to disable.
   CORS_ORIGIN_PATTERNS: z.preprocess(
-    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
-    z.string().default('https://real-time-chat-collaboration-application*.vercel.app')
+    emptyToUndefined,
+    z.string().default(`${PRODUCTION_CLIENT_URL},https://real-time-chat-collaboration-application*.vercel.app`)
   ),
   COOKIE_SECURE: toBool(isProd),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
@@ -68,7 +74,10 @@ const schema = z.object({
   DEMO_USER2_EMAIL: z.string().email().default('maya.demo@example.com'),
   DEMO_USER3_EMAIL: z.string().email().default('liam.demo@example.com'),
   DEMO_ADMIN_EMAIL: z.string().email().default('admin.demo@example.com'),
-  DEMO_USER_PASSWORD: optionalString,
+  // Public demo credentials (shown on the sign-in page), one per account. Stored hashed with bcrypt.
+  DEMO_USER1_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(8).default('DemoUser1@2026')),
+  DEMO_USER2_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(8).default('DemoUser2@2026')),
+  DEMO_USER3_PASSWORD: z.preprocess(emptyToUndefined, z.string().min(8).default('DemoUser3@2026')),
   DEMO_ADMIN_PASSWORD: optionalString,
   DEMO_SEED_SAMPLE_DATA: toBool(true),
   DEMO_SHOW_CREDENTIALS: toBool(true),
@@ -212,7 +221,7 @@ export const config = {
     enabled: env.DEMO_MODE,
     seedSampleData: env.DEMO_SEED_SAMPLE_DATA,
     // Show the demo emails + passwords on the sign-in page (only ever applies while DEMO_MODE is on).
-    // Only DEMO_USER_PASSWORD / DEMO_ADMIN_PASSWORD are ever published — never other secrets.
+    // Only the DEMO_USER1..3_PASSWORD / DEMO_ADMIN_PASSWORD values are ever published — never other secrets.
     showCredentials: env.DEMO_SHOW_CREDENTIALS,
     accounts: [
       {
@@ -222,7 +231,7 @@ export const config = {
         fullName: 'Aarav Sharma',
         username: 'aarav',
         email: env.DEMO_USER1_EMAIL.toLowerCase(),
-        password: env.DEMO_USER_PASSWORD,
+        password: env.DEMO_USER1_PASSWORD,
         bio: 'Product designer. Coffee, typography and late-night shipping.',
       },
       {
@@ -232,7 +241,7 @@ export const config = {
         fullName: 'Maya Chen',
         username: 'maya',
         email: env.DEMO_USER2_EMAIL.toLowerCase(),
-        password: env.DEMO_USER_PASSWORD,
+        password: env.DEMO_USER2_PASSWORD,
         bio: 'Frontend engineer who loves fast UIs and faster feedback loops.',
       },
       {
@@ -242,7 +251,7 @@ export const config = {
         fullName: 'Liam Carter',
         username: 'liam',
         email: env.DEMO_USER3_EMAIL.toLowerCase(),
-        password: env.DEMO_USER_PASSWORD,
+        password: env.DEMO_USER3_PASSWORD,
         bio: 'Backend & infra. Ask me about sockets.',
       },
       {

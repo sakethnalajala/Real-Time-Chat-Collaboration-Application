@@ -9,7 +9,8 @@ const strongRandomPassword = () => `Demo-${crypto.randomBytes(9).toString('base6
 
 /**
  * Creates (or repairs) the four demo accounts from configuration.
- * Passwords come from DEMO_USER_PASSWORD / DEMO_ADMIN_PASSWORD; if unset, a strong random password
+ * Passwords come from DEMO_USER1..3_PASSWORD / DEMO_ADMIN_PASSWORD (hashed with bcrypt on save) and are
+ * re-synced on every start; if the admin one is unset, a strong random password
  * is generated (one-click demo login on the sign-in page does not need it).
  * Returns the accounts keyed by `user1 | user2 | user3 | admin`.
  */

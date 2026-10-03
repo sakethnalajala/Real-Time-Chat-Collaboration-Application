@@ -23,7 +23,7 @@ services:
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: CLIENT_URL
-        sync: false # your Vercel production URL, e.g. https://your-app.vercel.app (reset links + CORS)
+        value: https://real-time-chat-collaboration-applic.vercel.app # Vercel production domain (reset links + CORS)
       - key: CORS_ORIGINS
         sync: false # optional extra origins (Vercel preview URLs), comma separated
       - key: TRUST_PROXY
@@ -40,7 +40,7 @@ services:
       # admin-created reset links (Admin → Users → user → Reset link).
       - key: DEMO_MODE
         value: "true"
-      - key: DEMO_USER_PASSWORD
-        sync: false
+      # Demo users default to DemoUser1@2026 / DemoUser2@2026 / DemoUser3@2026
+      # (override with DEMO_USER1_PASSWORD … DEMO_USER3_PASSWORD).
       - key: DEMO_ADMIN_PASSWORD
         sync: false

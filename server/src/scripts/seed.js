@@ -24,7 +24,7 @@ try {
   }
   console.log(`\n  New accounts: ${created}. Sample conversations ${seeded ? 'created' : 'already present (use --reset to recreate)'}.`);
   if (!config.demo.accounts.every((a) => a.password)) {
-    console.log('  Tip: set DEMO_USER_PASSWORD / DEMO_ADMIN_PASSWORD to sign in with email + password as well.');
+    console.log('  Tip: set DEMO_ADMIN_PASSWORD to sign in as the demo admin with email + password as well.');
   }
   console.log('');
 } catch (err) {

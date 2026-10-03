@@ -172,19 +172,21 @@ describe('Authentication', () => {
   });
 
   describe('demo accounts', () => {
-    const passwords = { user: 'Demo-Pass-4821x', admin: 'Admin-Pass-7395y' };
+    // Demo users use the built-in defaults; the admin password comes from DEMO_ADMIN_PASSWORD.
+    const passwords = { user1: 'DemoUser1@2026', user2: 'DemoUser2@2026', user3: 'DemoUser3@2026', admin: 'Admin-Pass-7395y' };
     let config;
     let original;
+    let ensureDemoAccounts;
 
     beforeAll(async () => {
       ({ config } = await import('../src/config/env.js'));
-      const { ensureDemoAccounts } = await import('../src/services/demo.service.js');
+      ({ ensureDemoAccounts } = await import('../src/services/demo.service.js'));
       original = config.demo;
       config.demo = {
         ...original,
         enabled: true,
         showCredentials: true,
-        accounts: original.accounts.map((a) => ({ ...a, password: passwords[a.role] })),
+        accounts: original.accounts.map((a) => (a.role === 'admin' ? { ...a, password: passwords.admin } : a)),
       };
       await ensureDemoAccounts({ log: false });
     });
@@ -205,11 +207,35 @@ describe('Authentication', () => {
       ]);
       for (const account of accounts) {
         expect(account.email).toMatch(/@/);
-        expect(account.password).toBe(passwords[account.role]);
+        expect(account.password).toBe(passwords[account.key]);
       }
       const body = JSON.stringify(res.body);
       expect(body).not.toContain(process.env.JWT_ACCESS_SECRET);
       expect(body).not.toMatch(/secret|smtp|api_?key|mongodb/i);
+    });
+
+    it('gives every demo user a different password and stores only bcrypt hashes', async () => {
+      const { User } = await import('../src/models/index.js');
+      const users = config.demo.accounts.filter((a) => a.role === 'user');
+      expect(new Set(users.map((a) => a.password)).size).toBe(3);
+      for (const account of config.demo.accounts) {
+        const stored = await User.findOne({ email: account.email }).select('+password').lean();
+        expect(stored.password).toMatch(/^\$2[aby]\$/);
+        expect(stored.password).not.toContain(account.password);
+      }
+    });
+
+    it('re-syncs a changed demo password on startup using the normal hashing', async () => {
+      const { User } = await import('../src/models/index.js');
+      const user = await User.findOne({ email: config.demo.accounts[1].email }).select('+password');
+      user.password = 'Old-Shared-Password-1';
+      await user.save();
+
+      await ensureDemoAccounts({ log: false });
+
+      const { email } = config.demo.accounts[1];
+      await request(app).post('/api/auth/login').send({ email, password: 'Old-Shared-Password-1' }).expect(401);
+      await request(app).post('/api/auth/login').send({ email, password: passwords.user2 }).expect(200);
     });
 
     it('hides the passwords when DEMO_SHOW_CREDENTIALS is off', async () => {
@@ -245,6 +271,7 @@ describe('Authentication', () => {
 
   it("accepts this project's Vercel URLs as CORS origins and rejects look-alikes", async () => {
     const allowed = [
+      'https://real-time-chat-collaboration-applic.vercel.app', // production domain (exact)
       'https://real-time-chat-collaboration-application.vercel.app',
       'https://real-time-chat-collaboration-application-nwjppw78f.vercel.app',
       'https://real-time-chat-collaboration-application-hometown-community-hub.vercel.app',
@@ -254,6 +281,9 @@ describe('Authentication', () => {
       expect(res.headers['access-control-allow-origin']).toBe(origin);
     }
     const rejected = [
+      'https://real-time-chat-collaboration-applicx.vercel.app',
+      'https://real-time-chat-collaboration-applic.vercel.app.evil.com',
+      'https://evil-real-time-chat-collaboration-applic.vercel.app',
       'https://evil.vercel.app',
       'https://real-time-chat-collaboration-application.evil.com',
       'https://real-time-chat-collaboration-application.x.vercel.app',
