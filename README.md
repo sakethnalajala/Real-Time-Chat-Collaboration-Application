@@ -11,7 +11,7 @@ A full-stack, production-ready messaging platform: private and group conversatio
 | --- | --- |
 | ![Chat in dark mode](docs/screenshots/chat-dark.png) | ![Chat in light mode](docs/screenshots/chat-light.png) |
 
-| Sign in with demo account cards | Admin profile |
+| Sign in with one-click demo accounts | Admin profile |
 | --- | --- |
 | ![Login](docs/screenshots/login.png) | ![Admin profile](docs/screenshots/admin-profile.png) |
 
@@ -104,7 +104,7 @@ A full-stack, production-ready messaging platform: private and group conversatio
   - Feature grid with a cursor spotlight, how-it-works steps, a scroll-animated product showcase, and security and call-to-action sections.
   - Full footer.
   - Shows "Open dashboard" to signed-in users.
-- **Sign-in page:** a card for each demo account showing avatar, name, role, email and password, with **Fill credentials** and **Use demo account** buttons.
+- **Sign-in page:** a **Demo Accounts** section with **Demo User** and **Demo Admin** cards (avatar, name, role, email) and a one-click **Use Demo Account** button. Passwords are never shown or sent to the browser. While the API wakes up, it shows a loading state; if the API can't be reached, it shows an error with **Try again**.
 - **Back buttons** throughout the sign-in flow:
   - Sign in → home.
   - Register, forgot password and reset password → sign in.
@@ -238,7 +238,7 @@ npm run dev
 | API | <http://localhost:5000> |
 | Health check | <http://localhost:5000/api/health> |
 
-- To test real-time features, open the app in **two different browsers** (or one normal and one private window) and sign in as two demo users.
+- To test real-time features, open the app in **two different browsers** (or one normal and one private window) and sign in as **Demo User** in one and **Demo Admin** in the other.
 - To reach the app from a phone on your network, open `http://<your-PC-IP>:5173`. The Vite proxy forwards API calls and WebSockets.
 
 ### Without the helper script
@@ -255,20 +255,21 @@ cd client && npm run dev       # terminal 2 — web app on :5173
 
 With `DEMO_MODE=true` (the default in development), the API creates four demo accounts on startup, plus sample conversations: two direct chats and one group.
 
-The sign-in page shows a **card for each demo account** with its role, email and password.
-- **Fill credentials** puts them into the form.
-- **Use demo account** signs in straight away.
+The sign-in page has a **Demo Accounts** section with two cards, **Demo User** and **Demo Admin**, each showing the account's name, role and email.
+- **Use Demo Account** signs in straight away through `POST /api/auth/demo-login`.
+- The demo passwords are **never displayed or sent to the browser**: `/api/config` lists the accounts without passwords.
+- If the API is still waking up (Render free tier), the section shows a loading state. If the API can't be reached, it shows an error with **Try again** instead of disappearing.
 
-The passwords shown are the real ones configured on the server. Set `DEMO_SHOW_CREDENTIALS=false` to hide them and keep only one-click sign-in.
+| Account | Email | Role | On the sign-in page |
+| --- | --- | --- | --- |
+| Demo User 1 — Aarav Sharma | `aarav.demo@example.com` | user | **Demo User** |
+| Demo User 2 — Maya Chen | `maya.demo@example.com` | user | — |
+| Demo User 3 — Liam Carter | `liam.demo@example.com` | user | — |
+| Demo Admin — Nova Admin | `admin.demo@example.com` | **admin** | **Demo Admin** |
 
-| Account | Email | Role |
-| --- | --- | --- |
-| Demo User 1 — Aarav Sharma | `aarav.demo@example.com` | user |
-| Demo User 2 — Maya Chen | `maya.demo@example.com` | user |
-| Demo User 3 — Liam Carter | `liam.demo@example.com` | user |
-| Demo Admin — Nova Admin | `admin.demo@example.com` | **admin** |
+Demo User (Aarav) starts with sample chats with Maya and Liam and a group with both. Maya and Liam are also available through `POST /api/auth/demo-login` with `{"account":"user2"}` or `{"account":"user3"}` (e.g. from Postman).
 
-- **Passwords** come from `DEMO_USER_PASSWORD` and `DEMO_ADMIN_PASSWORD` in `server/.env`, so you can also sign in with email and password, e.g. from Postman. If unset, strong random passwords are generated.
+- **Passwords** come from `DEMO_USER_PASSWORD` and `DEMO_ADMIN_PASSWORD` in `server/.env` (Render environment in production), so you can also sign in with email and password through the normal form or Postman. If unset, strong random passwords are generated. One-click sign-in doesn't need them.
 - **Safeguards for a public demo:**
   - Demo accounts can't change their password or username.
   - Demo accounts can't be password-reset.
@@ -303,10 +304,9 @@ The passwords shown are the real ones configured on the server. Set `DEMO_SHOW_C
 | `MAX_FILE_SIZE_MB` / `MAX_FILES_PER_MESSAGE` | | `10` / `5` | Upload limits |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS` | no | empty | **Not used — leave empty.** Optional email support exists, but the app doesn't need it |
 | `PASSWORD_RESET_TTL_MINUTES` | | `30` | Reset link lifetime |
-| `DEMO_MODE` | | `true` in dev, `false` in prod | Demo accounts + one-click login |
+| `DEMO_MODE` | | `true` in dev, `false` in prod (`render.yaml` sets `true`) | Demo accounts + one-click login |
 | `DEMO_USER1_EMAIL` … `DEMO_ADMIN_EMAIL` | | `*.demo@example.com` | Demo account emails |
-| `DEMO_USER_PASSWORD`, `DEMO_ADMIN_PASSWORD` | | random | Demo passwords |
-| `DEMO_SHOW_CREDENTIALS` | | `true` | Show demo emails/passwords on the sign-in page (only while `DEMO_MODE` is on) |
+| `DEMO_USER_PASSWORD`, `DEMO_ADMIN_PASSWORD` | | random | Demo passwords (server only — never sent to the browser) |
 | `LOG_LEVEL` | | `debug` dev / `info` prod | Logging verbosity |
 
 **How the app behaves when credentials are missing:**
@@ -315,10 +315,12 @@ The passwords shown are the real ones configured on the server. Set `DEMO_SHOW_C
 
 ### Client (`client/.env.local` locally, Vercel environment in production)
 
+Production builds also read `client/.env.production`, which holds the public, non-secret defaults for this deployment. Variables set in Vercel take priority.
+
 | Variable | Default | Description |
 | --- | --- | --- |
 | `VITE_API_URL` | `/api` | Keep `/api` (Vite proxy in dev, Vercel rewrite in prod) |
-| `VITE_SOCKET_URL` | current origin | **Production: your Render URL** (e.g. `https://nebula-chat-api.onrender.com`) |
+| `VITE_SOCKET_URL` | current origin (dev) · `https://real-time-chat-collaboration-application.onrender.com` (production build) | Socket.IO server. **Production: your Render URL** — Vercel can't proxy WebSockets |
 | `VITE_APP_NAME` | `Nebula Chat` | Display name |
 | `VITE_ENABLE_DEMO_LOGIN` | `true` | Show one-click demo accounts |
 | `VITE_DEV_API_TARGET` | `http://localhost:5000` | Dev proxy target |
@@ -558,16 +560,25 @@ Nothing to configure. This project deliberately uses no email service, so leave 
 4. Deploy, then open `https://<your-service>.onrender.com/api/health`. It should return `"database":"connected"`.
 
 ### 5. Vercel (web app)
-1. Edit `client/vercel.json` and replace both `YOUR-RENDER-SERVICE.onrender.com` placeholders with your Render host, then commit.
-2. In Vercel, choose **Add New → Project**, import the repo and set **Root Directory: `client`**. The framework (Vite), build command and output directory are detected.
-3. Environment variables:
-   - `VITE_API_URL=/api`
-   - `VITE_SOCKET_URL=https://<your-service>.onrender.com`
+This project's API runs at **`https://real-time-chat-collaboration-application.onrender.com`**. It is already set in:
+- `client/vercel.json`: rewrites `/api/*` and `/uploads/*` to Render.
+- `client/.env.production`: `VITE_SOCKET_URL` for Socket.IO.
+
+If you deploy your own copy, replace that host in both files.
+
+1. In Vercel, choose **Add New → Project**, import the repo and set **Root Directory: `client`**. The framework (Vite), build command and output directory are detected.
+2. Environment variables are optional (the defaults above apply). If you set them, use:
+   - `VITE_API_URL=/api` (never the Render URL — that breaks the first-party cookie)
+   - `VITE_SOCKET_URL=https://real-time-chat-collaboration-application.onrender.com`
    - `VITE_ENABLE_DEMO_LOGIN=true`
-4. Deploy. Then on Render, set `CLIENT_URL=https://<your-app>.vercel.app` (add preview URLs to `CORS_ORIGINS` if needed) and redeploy.
+3. Deploy, then copy your production domain (Vercel → Project → **Domains**, e.g. `https://<your-app>.vercel.app`).
+4. **Required:** on Render, set `CLIENT_URL` to that exact URL (no trailing slash) and save. Render redeploys automatically.
+   - To use other Vercel URLs too (preview or deployment URLs), add them to `CORS_ORIGINS`, comma separated.
+   - Without this step, the API rejects sign-in and the live connection from the Vercel site with `403 This origin is not allowed`.
 
 ### Production checklist
 - [ ] `/api/health` reports `database: connected`.
+- [ ] The sign-in page shows **Demo Accounts**, and **Use Demo Account** signs in as Demo User and as Demo Admin.
 - [ ] Sign in works and survives a page reload (refresh cookie through the `/api` rewrite).
 - [ ] Two browsers exchange messages instantly. If not, check `VITE_SOCKET_URL` and `CLIENT_URL`/CORS on Render.
 - [ ] Image upload works (Cloudinary).
@@ -588,6 +599,9 @@ Nothing to configure. This project deliberately uses no email service, so leave 
 | `MongoDB is not reachable at localhost:27017` | Start your MongoDB service (Windows: `net start MongoDB` as administrator, or start it from *Services*). |
 | `MONGODB_URI is not set` | Add `MONGODB_URI=mongodb://localhost:27017/real_time_chat` to `server/.env`. |
 | API restarts by itself during development | Cloud-sync tools (OneDrive/Dropbox) touch files and trigger `node --watch`. Keep the project outside a synced folder for the smoothest experience. |
+| Demo Accounts shows "Couldn't load the demo accounts" | The web app can't reach the API. Check that `client/vercel.json` points at your Render host and that `/api/health` responds. A sleeping Render instance can take ~50 s to start — press **Try again**. |
+| Demo Accounts shows "Demo sign-in is turned off on this server" | Set `DEMO_MODE=true` on Render. |
+| Sign-in fails with "This origin is not allowed" | Render's `CLIENT_URL` (or `CORS_ORIGINS`) doesn't include the URL in your browser's address bar. Add it exactly, without a trailing slash. |
 | Logged out on every reload in production | Keep `VITE_API_URL=/api` with the Vercel rewrite, so the cookie is first-party. If you call Render directly, set `COOKIE_SAMESITE=none`. |
 | Messages only appear after refresh | `VITE_SOCKET_URL` must point at Render, and Render's `CLIENT_URL`/`CORS_ORIGINS` must include the Vercel URL. |
 | Uploads say "not configured" in production | Set `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET` on Render. |

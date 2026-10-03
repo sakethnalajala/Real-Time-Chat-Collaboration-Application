@@ -23,7 +23,7 @@ services:
       - key: JWT_ACCESS_SECRET
         generateValue: true
       - key: CLIENT_URL
-        sync: false # e.g. https://your-app.vercel.app
+        sync: false # REQUIRED: your Vercel production URL, e.g. https://your-app.vercel.app (CORS for sign-in + sockets)
       - key: CORS_ORIGINS
         sync: false # optional extra origins (Vercel preview URLs), comma separated
       - key: TRUST_PROXY

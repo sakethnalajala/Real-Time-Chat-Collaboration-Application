@@ -65,7 +65,6 @@ const schema = z.object({
   DEMO_USER_PASSWORD: optionalString,
   DEMO_ADMIN_PASSWORD: optionalString,
   DEMO_SEED_SAMPLE_DATA: toBool(true),
-  DEMO_SHOW_CREDENTIALS: toBool(true),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default(isProd ? 'info' : 'debug'),
 });
@@ -190,8 +189,6 @@ export const config = {
   demo: {
     enabled: env.DEMO_MODE,
     seedSampleData: env.DEMO_SEED_SAMPLE_DATA,
-    // Show demo emails + passwords on the sign-in page (only ever applies while DEMO_MODE is on).
-    showCredentials: env.DEMO_SHOW_CREDENTIALS,
     accounts: [
       {
         key: 'user1',

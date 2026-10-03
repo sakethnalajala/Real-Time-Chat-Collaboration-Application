@@ -1,9 +1,9 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Check, Copy, KeyRound, LogIn, Mail, MousePointerClick, ShieldCheck, Sparkles, TextCursorInput, User } from 'lucide-react';
+import { Check, Copy, Info, KeyRound, LogIn, Mail, MousePointerClick, RefreshCw, ServerCrash, ShieldCheck, Sparkles, User } from 'lucide-react';
 import { toast } from 'sonner';
 import Button from '../../components/ui/Button.jsx';
 import { Input, PasswordInput } from '../../components/ui/Input.jsx';
@@ -58,7 +58,20 @@ function CredentialRow({ icon: Icon, label, value, mono, copyable }) {
   );
 }
 
-function DemoAccountCard({ account, index, onFill, onUse, loading, disabled }) {
+// The sign-in page offers one demo account per role. Sign-in goes through POST /auth/demo-login,
+// so passwords never reach the browser.
+const DEMO_SLOTS = [
+  { role: 'user', title: 'Demo User' },
+  { role: 'admin', title: 'Demo Admin' },
+];
+
+const pickDemoAccounts = (accounts = []) =>
+  DEMO_SLOTS.flatMap(({ role, title }) => {
+    const account = accounts.find((a) => a.role === role);
+    return account ? [{ ...account, title }] : [];
+  });
+
+function DemoAccountCard({ account, index, onUse, loading, disabled }) {
   const isAdmin = account.role === 'admin';
   return (
     <motion.article
@@ -72,7 +85,7 @@ function DemoAccountCard({ account, index, onFill, onUse, loading, disabled }) {
           ? 'border-brand-500/40 bg-linear-to-br from-brand-500/14 via-surface/70 to-fuchsia-500/8 hover:shadow-brand-700/25'
           : 'border-line bg-surface/70 hover:border-brand-500/30 hover:shadow-brand-900/15'
       )}
-      aria-label={`${account.label} demo account`}
+      aria-label={account.title}
     >
       <span
         className="pointer-events-none absolute -top-12 -right-12 h-28 w-28 rounded-full bg-brand-500/20 opacity-0 blur-2xl transition-opacity duration-500 group-hover:opacity-100"
@@ -81,7 +94,7 @@ function DemoAccountCard({ account, index, onFill, onUse, loading, disabled }) {
       <header className="relative flex items-center gap-3">
         <Avatar name={account.fullName} size="md" />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-semibold text-fg">{account.label}</h3>
+          <h3 className="truncate text-sm font-semibold text-fg">{account.title}</h3>
           <p className="truncate text-xs text-muted">{account.fullName}</p>
         </div>
         <Badge tone={isAdmin ? 'brand' : 'neutral'}>
@@ -96,60 +109,82 @@ function DemoAccountCard({ account, index, onFill, onUse, loading, disabled }) {
           <span className="text-fg">{isAdmin ? 'Administrator' : 'Standard user'}</span>
         </div>
         <CredentialRow icon={Mail} label="Email" value={account.email} copyable />
-        <CredentialRow
-          icon={KeyRound}
-          label="Password"
-          value={account.password || 'Hidden — use one-click sign-in'}
-          mono={Boolean(account.password)}
-          copyable={Boolean(account.password)}
-        />
+        <CredentialRow icon={KeyRound} label="Sign-in" value="One click — no password needed" />
       </dl>
 
-      <div className="relative mt-3 grid gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          leftIcon={TextCursorInput}
-          onClick={() => onFill(account)}
-          disabled={!account.password || disabled}
-          title={account.password ? 'Put these credentials into the sign-in form' : 'Password is not published by this server'}
-        >
-          Fill credentials
-        </Button>
-        <Button size="sm" leftIcon={MousePointerClick} onClick={() => onUse(account)} loading={loading} disabled={disabled}>
-          Use demo account
-        </Button>
-      </div>
+      <Button size="sm" className="relative mt-3" leftIcon={MousePointerClick} onClick={() => onUse(account)} loading={loading} disabled={disabled}>
+        Use Demo Account
+      </Button>
     </motion.article>
   );
 }
 
-function DemoAccountsSection({ accounts, isLoading, onFill, onUse, loadingKey, disabled }) {
+function DemoNotice({ icon: Icon, tone, title, children, action }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      role={tone === 'danger' ? 'alert' : 'status'}
+      className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface/70 px-4 py-6 text-center"
+    >
+      <span
+        className={cn(
+          'flex h-11 w-11 items-center justify-center rounded-2xl border',
+          tone === 'danger' ? 'border-rose-500/25 bg-rose-500/10 text-rose-500' : 'border-brand-500/25 bg-brand-500/10 text-brand-400'
+        )}
+      >
+        <Icon className="h-5 w-5" aria-hidden />
+      </span>
+      <div>
+        <p className="text-sm font-semibold text-fg">{title}</p>
+        <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-muted">{children}</p>
+      </div>
+      {action}
+    </motion.div>
+  );
+}
+
+/** status: 'loading' | 'ready' | 'error' | 'unavailable' */
+function DemoAccountsSection({ status, accounts, onRetry, onUse, loadingKey, disabled }) {
   return (
     <section className="mt-6 rounded-3xl border border-line bg-surface/60 p-5 shadow-2xl shadow-black/10 backdrop-blur-xl sm:p-6 dark:shadow-black/30" aria-labelledby="demo-heading">
       <div className="mb-4 flex flex-wrap items-end justify-between gap-2">
         <div>
           <h2 id="demo-heading" className="flex items-center gap-2 text-base font-semibold text-fg">
-            <Sparkles className="h-4 w-4 text-brand-400" /> Demo accounts
+            <Sparkles className="h-4 w-4 text-brand-400" /> Demo Accounts
           </h2>
-          <p className="mt-0.5 text-xs text-muted">Real accounts on this server. Fill the form or sign in with one click.</p>
+          <p className="mt-0.5 text-xs text-muted">Real accounts on this server. Sign in with one click — no password needed.</p>
         </div>
-        <Badge tone="brand">Demo passwords can't be changed</Badge>
+        <Badge tone="brand">One-click sign-in</Badge>
       </div>
-      {isLoading ? (
-        <div className="grid gap-3 sm:grid-cols-2">
-          {Array.from({ length: 4 }, (_, i) => (
-            <Skeleton key={i} className="h-56 rounded-2xl" />
-          ))}
-        </div>
-      ) : (
+
+      {status === 'loading' && (
+        <>
+          <div className="grid gap-3 sm:grid-cols-2" aria-busy="true" aria-label="Loading demo accounts">
+            {DEMO_SLOTS.map((slot) => (
+              <Skeleton key={slot.role} className="h-52 rounded-2xl" />
+            ))}
+          </div>
+          {/* Free hosting sleeps when idle; the first request can take up to a minute. */}
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 4 }}
+            className="mt-3 text-center text-xs text-muted"
+            role="status"
+          >
+            Waking up the server — this can take up to a minute on the first visit.
+          </motion.p>
+        </>
+      )}
+
+      {status === 'ready' && (
         <div className="grid gap-3 sm:grid-cols-2">
           {accounts.map((account, index) => (
             <DemoAccountCard
               key={account.key}
               account={account}
               index={index}
-              onFill={onFill}
               onUse={onUse}
               loading={loadingKey === account.key}
               disabled={disabled}
@@ -157,8 +192,31 @@ function DemoAccountsSection({ accounts, isLoading, onFill, onUse, loadingKey, d
           ))}
         </div>
       )}
+
+      {status === 'error' && (
+        <DemoNotice
+          icon={ServerCrash}
+          tone="danger"
+          title="Couldn't load the demo accounts"
+          action={
+            <Button variant="secondary" size="sm" leftIcon={RefreshCw} onClick={onRetry}>
+              Try again
+            </Button>
+          }
+        >
+          The server didn't respond. It may still be starting up — try again in a moment.
+        </DemoNotice>
+      )}
+
+      {status === 'unavailable' && (
+        <DemoNotice icon={Info} title="Demo sign-in is turned off on this server">
+          Sign in with your account above, or create one in a few seconds.
+        </DemoNotice>
+      )}
+
       <p className="mt-4 text-center text-[11px] text-subtle">
-        Tip: open two browsers (or a private window) and sign in as two users to watch messages, typing and read receipts update live.
+        Tip: sign in as Demo User in one browser and Demo Admin in another (or a private window) to watch messages, typing and read receipts
+        update live.
       </p>
     </section>
   );
@@ -167,21 +225,16 @@ function DemoAccountsSection({ accounts, isLoading, onFill, onUse, loadingKey, d
 export default function LoginPage() {
   useDocumentTitle('Sign in · Nebula Chat');
   const { login, demoLogin } = useAuth();
-  const { config, isLoading: configLoading } = useAppConfig();
+  const { config, isLoading: configLoading, isFetching: configFetching, isError: configError, refetch: refetchConfig } = useAppConfig();
   const navigate = useNavigate();
   const location = useLocation();
-  const formRef = useRef(null);
-  const submitRef = useRef(null);
   const [demoLoading, setDemoLoading] = useState(null);
-  const [filled, setFilled] = useState(null);
   const redirectTo = location.state?.from?.pathname || '/dashboard';
 
   const {
     register,
     handleSubmit,
     setError,
-    setValue,
-    clearErrors,
     formState: { errors, isSubmitting },
   } = useForm({ resolver: zodResolver(loginSchema), defaultValues: { email: '', password: '' } });
 
@@ -195,23 +248,10 @@ export default function LoginPage() {
     }
   };
 
-  const fillCredentials = (account) => {
-    setValue('email', account.email, { shouldDirty: true });
-    setValue('password', account.password, { shouldDirty: true });
-    clearErrors();
-    setFilled(account.key);
-    setTimeout(() => setFilled(null), 1600);
-    formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    setTimeout(() => submitRef.current?.focus({ preventScroll: true }), 350);
-    toast.success(`${account.label} credentials filled — press Sign in`);
-  };
-
   const signInWithDemo = async (account) => {
     setDemoLoading(account.key);
     try {
-      // Uses the normal email/password sign-in when the password is published,
-      // otherwise the server's one-click demo endpoint.
-      const user = account.password ? await login({ email: account.email, password: account.password }) : await demoLogin(account.key);
+      const user = await demoLogin(account.key);
       toast.success(`Signed in as ${user.fullName}`);
       navigate(redirectTo, { replace: true });
     } catch (error) {
@@ -221,8 +261,14 @@ export default function LoginPage() {
     }
   };
 
-  const filledRing = filled ? 'border-brand-500 ring-4 ring-brand-500/25' : undefined;
-  const showDemo = ENABLE_DEMO_LOGIN && (configLoading || (config.demo?.enabled && config.demo.accounts?.length > 0));
+  const demoAccounts = config.demo?.enabled ? pickDemoAccounts(config.demo.accounts) : [];
+  const demoStatus = demoAccounts.length
+    ? 'ready'
+    : configLoading || configFetching
+      ? 'loading'
+      : configError
+        ? 'error'
+        : 'unavailable';
 
   return (
     <>
@@ -238,30 +284,28 @@ export default function LoginPage() {
           </>
         }
       >
-        <form ref={formRef} onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
           <Input
-              label="Email"
-              type="email"
-              autoComplete="email"
-              icon={Mail}
-              placeholder="you@example.com"
-              error={errors.email?.message}
-              inputClassName={filledRing}
-              {...register('email')}
-            />
-            <PasswordInput
-              label="Password"
-              autoComplete="current-password"
-              placeholder="••••••••"
-              error={errors.password?.message}
-              labelRight={
-                <Link to="/forgot-password" className="text-xs font-semibold text-accent-fg hover:underline">
-                  Forgot password?
-                </Link>
-              }
-              inputClassName={filledRing}
-              {...register('password')}
-            />
+            label="Email"
+            type="email"
+            autoComplete="email"
+            icon={Mail}
+            placeholder="you@example.com"
+            error={errors.email?.message}
+            {...register('email')}
+          />
+          <PasswordInput
+            label="Password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            error={errors.password?.message}
+            labelRight={
+              <Link to="/forgot-password" className="text-xs font-semibold text-accent-fg hover:underline">
+                Forgot password?
+              </Link>
+            }
+            {...register('password')}
+          />
           <AnimatePresence>
             {errors.root && (
               <motion.p
@@ -275,17 +319,17 @@ export default function LoginPage() {
               </motion.p>
             )}
           </AnimatePresence>
-          <Button ref={submitRef} type="submit" size="lg" className="w-full" loading={isSubmitting} leftIcon={LogIn}>
+          <Button type="submit" size="lg" className="w-full" loading={isSubmitting} leftIcon={LogIn}>
             Sign in
           </Button>
         </form>
       </AuthCard>
 
-      {showDemo && (
+      {ENABLE_DEMO_LOGIN && (
         <DemoAccountsSection
-          accounts={config.demo?.accounts ?? []}
-          isLoading={configLoading}
-          onFill={fillCredentials}
+          status={demoStatus}
+          accounts={demoAccounts}
+          onRetry={() => refetchConfig()}
           onUse={signInWithDemo}
           loadingKey={demoLoading}
           disabled={Boolean(demoLoading) || isSubmitting}

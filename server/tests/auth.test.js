@@ -170,4 +170,38 @@ describe('Authentication', () => {
     expect(body).not.toContain(process.env.JWT_ACCESS_SECRET);
     expect(body).not.toMatch(/secret|smtp|api_?key|"password"/i);
   });
+
+  it('lists demo accounts without their passwords and signs them in with one click', async () => {
+    const { config } = await import('../src/config/env.js');
+    const { ensureDemoAccounts } = await import('../src/services/demo.service.js');
+    const original = config.demo;
+    const passwords = { user: 'Demo-Pass-4821x', admin: 'Admin-Pass-7395y' };
+    config.demo = { ...original, enabled: true, accounts: original.accounts.map((a) => ({ ...a, password: passwords[a.role] })) };
+    try {
+      await ensureDemoAccounts({ log: false });
+
+      const res = await request(app).get('/api/config').expect(200);
+      const { accounts } = res.body.data.demo;
+      expect(res.body.data.demo.enabled).toBe(true);
+      expect(accounts.map((a) => a.role)).toEqual(expect.arrayContaining(['user', 'admin']));
+      const body = JSON.stringify(res.body);
+      expect(body).not.toMatch(/"password"/i);
+      expect(body).not.toContain(passwords.user);
+      expect(body).not.toContain(passwords.admin);
+
+      for (const account of accounts.filter((a) => a.key === 'user1' || a.key === 'admin')) {
+        const login = await request(app).post('/api/auth/demo-login').send({ account: account.key }).expect(200);
+        expect(login.body.data.accessToken).toEqual(expect.any(String));
+        expect(login.body.data.user.email).toBe(account.email);
+        expect(login.body.data.user.role).toBe(account.role);
+        expect(refreshCookie(login)).toBeTruthy();
+      }
+
+      // The configured password still works with the normal email + password form.
+      const admin = accounts.find((a) => a.role === 'admin');
+      await request(app).post('/api/auth/login').send({ email: admin.email, password: passwords.admin }).expect(200);
+    } finally {
+      config.demo = original;
+    }
+  });
 });

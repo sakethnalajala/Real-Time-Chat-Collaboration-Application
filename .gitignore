@@ -6,6 +6,8 @@ node_modules/
 .env.*
 !.env.example
 client/.env.local
+# Public build defaults only (Render URL for Socket.IO) — no secrets.
+!client/.env.production
 
 # Builds
 client/dist/

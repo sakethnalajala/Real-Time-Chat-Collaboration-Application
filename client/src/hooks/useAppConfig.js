@@ -18,5 +18,11 @@ export function useAppConfig() {
     gcTime: Infinity,
     retry: 2,
   });
-  return { config: query.data ?? FALLBACK, isLoading: query.isLoading, isError: query.isError, refetch: query.refetch };
+  return {
+    config: query.data ?? FALLBACK,
+    isLoading: query.isLoading,
+    isFetching: query.isFetching,
+    isError: query.isError,
+    refetch: query.refetch,
+  };
 }
