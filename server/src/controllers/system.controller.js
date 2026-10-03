@@ -24,10 +24,19 @@ export function publicConfig(_req, res) {
     appName: config.appName,
     demo: {
       enabled: config.demo.enabled,
-      // Demo accounts are listed for one-click sign-in (POST /api/auth/demo-login). Their passwords
-      // are never sent to the browser.
+      // Demo accounts are intentionally public (they cannot change their password, and the demo
+      // admin can only manage demo accounts). Their passwords are listed when configured and
+      // DEMO_SHOW_CREDENTIALS is on; one-click sign-in (POST /api/auth/demo-login) works either way.
       accounts: config.demo.enabled
-        ? config.demo.accounts.map(({ key, label, fullName, username, email, role }) => ({ key, label, fullName, username, email, role }))
+        ? config.demo.accounts.map(({ key, label, fullName, username, email, role, password }) => ({
+            key,
+            label,
+            fullName,
+            username,
+            email,
+            role,
+            password: config.demo.showCredentials && password ? password : null,
+          }))
         : [],
     },
     uploads: {

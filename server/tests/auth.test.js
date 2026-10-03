@@ -171,37 +171,98 @@ describe('Authentication', () => {
     expect(body).not.toMatch(/secret|smtp|api_?key|"password"/i);
   });
 
-  it('lists demo accounts without their passwords and signs them in with one click', async () => {
-    const { config } = await import('../src/config/env.js');
-    const { ensureDemoAccounts } = await import('../src/services/demo.service.js');
-    const original = config.demo;
+  describe('demo accounts', () => {
     const passwords = { user: 'Demo-Pass-4821x', admin: 'Admin-Pass-7395y' };
-    config.demo = { ...original, enabled: true, accounts: original.accounts.map((a) => ({ ...a, password: passwords[a.role] })) };
-    try {
-      await ensureDemoAccounts({ log: false });
+    let config;
+    let original;
 
+    beforeAll(async () => {
+      ({ config } = await import('../src/config/env.js'));
+      const { ensureDemoAccounts } = await import('../src/services/demo.service.js');
+      original = config.demo;
+      config.demo = {
+        ...original,
+        enabled: true,
+        showCredentials: true,
+        accounts: original.accounts.map((a) => ({ ...a, password: passwords[a.role] })),
+      };
+      await ensureDemoAccounts({ log: false });
+    });
+
+    afterAll(() => {
+      config.demo = original;
+    });
+
+    it('lists all four demo accounts with their credentials and no other secrets', async () => {
       const res = await request(app).get('/api/config').expect(200);
       const { accounts } = res.body.data.demo;
       expect(res.body.data.demo.enabled).toBe(true);
-      expect(accounts.map((a) => a.role)).toEqual(expect.arrayContaining(['user', 'admin']));
+      expect(accounts.map(({ key, label, role }) => ({ key, label, role }))).toEqual([
+        { key: 'user1', label: 'Demo User 1', role: 'user' },
+        { key: 'user2', label: 'Demo User 2', role: 'user' },
+        { key: 'user3', label: 'Demo User 3', role: 'user' },
+        { key: 'admin', label: 'Demo Admin', role: 'admin' },
+      ]);
+      for (const account of accounts) {
+        expect(account.email).toMatch(/@/);
+        expect(account.password).toBe(passwords[account.role]);
+      }
       const body = JSON.stringify(res.body);
-      expect(body).not.toMatch(/"password"/i);
-      expect(body).not.toContain(passwords.user);
-      expect(body).not.toContain(passwords.admin);
+      expect(body).not.toContain(process.env.JWT_ACCESS_SECRET);
+      expect(body).not.toMatch(/secret|smtp|api_?key|mongodb/i);
+    });
 
-      for (const account of accounts.filter((a) => a.key === 'user1' || a.key === 'admin')) {
+    it('hides the passwords when DEMO_SHOW_CREDENTIALS is off', async () => {
+      config.demo.showCredentials = false;
+      try {
+        const res = await request(app).get('/api/config').expect(200);
+        expect(res.body.data.demo.accounts).toHaveLength(4);
+        expect(res.body.data.demo.accounts.every((a) => a.password === null)).toBe(true);
+      } finally {
+        config.demo.showCredentials = true;
+      }
+    });
+
+    it('signs in every demo account with one click', async () => {
+      const { accounts } = (await request(app).get('/api/config')).body.data.demo;
+      for (const account of accounts) {
         const login = await request(app).post('/api/auth/demo-login').send({ account: account.key }).expect(200);
         expect(login.body.data.accessToken).toEqual(expect.any(String));
         expect(login.body.data.user.email).toBe(account.email);
         expect(login.body.data.user.role).toBe(account.role);
         expect(refreshCookie(login)).toBeTruthy();
       }
+    });
 
-      // The configured password still works with the normal email + password form.
-      const admin = accounts.find((a) => a.role === 'admin');
-      await request(app).post('/api/auth/login').send({ email: admin.email, password: passwords.admin }).expect(200);
-    } finally {
-      config.demo = original;
+    it('accepts the displayed credentials in the normal email + password form', async () => {
+      const { accounts } = (await request(app).get('/api/config')).body.data.demo;
+      for (const account of accounts) {
+        const login = await request(app).post('/api/auth/login').send({ email: account.email, password: account.password }).expect(200);
+        expect(login.body.data.user.role).toBe(account.role);
+      }
+    });
+  });
+
+  it("accepts this project's Vercel URLs as CORS origins and rejects look-alikes", async () => {
+    const allowed = [
+      'https://real-time-chat-collaboration-application.vercel.app',
+      'https://real-time-chat-collaboration-application-nwjppw78f.vercel.app',
+      'https://real-time-chat-collaboration-application-hometown-community-hub.vercel.app',
+    ];
+    for (const origin of allowed) {
+      const res = await request(app).get('/api/config').set('Origin', origin).expect(200);
+      expect(res.headers['access-control-allow-origin']).toBe(origin);
+    }
+    const rejected = [
+      'https://evil.vercel.app',
+      'https://real-time-chat-collaboration-application.evil.com',
+      'https://real-time-chat-collaboration-application.x.vercel.app',
+      'http://real-time-chat-collaboration-application.vercel.app',
+    ];
+    for (const origin of rejected) {
+      const res = await request(app).post('/api/auth/demo-login').set('Origin', origin).send({ account: 'user1' });
+      expect(res.status).toBe(403);
+      expect(res.body.error.code).toBe('CORS_REJECTED');
     }
   });
 });

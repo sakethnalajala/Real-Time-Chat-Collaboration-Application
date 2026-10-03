@@ -7,10 +7,19 @@
  *                  In production set it to the Render URL — Vercel cannot proxy WebSockets.
  */
 const trimSlash = (value) => value.replace(/\/+$/, '');
+const isAbsolute = (value) => /^https?:\/\//i.test(value);
 
-export const API_URL = trimSlash(import.meta.env.VITE_API_URL || '/api');
+// "https://api.example.com" → "https://api.example.com/api" (the API lives under /api).
+const resolveApiUrl = (value) => {
+  const url = trimSlash(value || '/api');
+  return isAbsolute(url) && new URL(url).pathname === '/' ? `${url}/api` : url;
+};
 
-export const SOCKET_URL = trimSlash(import.meta.env.VITE_SOCKET_URL || window.location.origin);
+export const API_URL = resolveApiUrl(import.meta.env.VITE_API_URL);
+
+// Socket.IO is served from the server root, so only the origin is used ("…onrender.com/api" → "…onrender.com").
+const socketUrl = import.meta.env.VITE_SOCKET_URL;
+export const SOCKET_URL = socketUrl && isAbsolute(socketUrl) ? new URL(socketUrl).origin : window.location.origin;
 
 export const APP_NAME = import.meta.env.VITE_APP_NAME || 'Nebula Chat';
 

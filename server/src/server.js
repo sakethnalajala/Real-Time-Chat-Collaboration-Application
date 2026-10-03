@@ -35,6 +35,7 @@ async function start() {
   server.listen(config.port, () => {
     logger.info(`[server] ${config.appName} API listening on http://localhost:${config.port} (${config.env})`);
     logger.info(`[server] CORS origins: ${config.corsOrigins.join(', ')}`);
+    if (config.corsOriginPatterns.length) logger.info(`[server] CORS origin patterns: ${config.corsOriginPatterns.map((re) => re.source).join(', ')}`);
     logger.info(`[server] File storage: ${storage.driverName}${storage.enabled ? '' : ' (uploads disabled)'}`);
     logger.info(
       `[server] Email: ${mailService.isConfigured() ? 'SMTP configured' : config.isProd ? 'not used — password resets via admin-created reset links' : 'not used — reset links are shown on screen and logged here (dev)'}`

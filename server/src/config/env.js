@@ -36,6 +36,12 @@ const schema = z.object({
 
   CLIENT_URL: z.string().url().default('http://localhost:5173'),
   CORS_ORIGINS: z.string().default(''),
+  // Wildcard origins ("*" matches letters, digits and dashes — never a dot). The default accepts
+  // this project's Vercel production, preview and deployment URLs. Set to "none" to disable.
+  CORS_ORIGIN_PATTERNS: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z.string().default('https://real-time-chat-collaboration-application*.vercel.app')
+  ),
   COOKIE_SECURE: toBool(isProd),
   COOKIE_SAMESITE: z.enum(['lax', 'strict', 'none']).default('lax'),
   TRUST_PROXY: z.string().default(isProd ? '1' : 'false'),
@@ -65,6 +71,7 @@ const schema = z.object({
   DEMO_USER_PASSWORD: optionalString,
   DEMO_ADMIN_PASSWORD: optionalString,
   DEMO_SEED_SAMPLE_DATA: toBool(true),
+  DEMO_SHOW_CREDENTIALS: toBool(true),
 
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default(isProd ? 'info' : 'debug'),
 });
@@ -115,6 +122,20 @@ const corsOrigins = Array.from(
   )
 );
 
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/** "https://my-app*.vercel.app" → /^https:\/\/my-app[a-z0-9-]*\.vercel\.app$/i */
+const toOriginPattern = (pattern) =>
+  new RegExp(`^${pattern.replace(/\/$/, '').split('*').map(escapeRegExp).join('[a-z0-9-]*')}$`, 'i');
+
+const corsOriginPatterns =
+  env.CORS_ORIGIN_PATTERNS.trim().toLowerCase() === 'none'
+    ? []
+    : env.CORS_ORIGIN_PATTERNS.split(',')
+        .map((pattern) => pattern.trim())
+        .filter(Boolean)
+        .map(toOriginPattern);
+
 // Cloudinary is enabled only when all three credentials are present.
 const cloudinaryVars = {
   CLOUDINARY_CLOUD_NAME: env.CLOUDINARY_CLOUD_NAME,
@@ -156,6 +177,7 @@ export const config = {
 
   clientUrl: env.CLIENT_URL.replace(/\/$/, ''),
   corsOrigins,
+  corsOriginPatterns,
   trustProxy: parseTrustProxy(env.TRUST_PROXY),
 
   storage: {
@@ -189,6 +211,9 @@ export const config = {
   demo: {
     enabled: env.DEMO_MODE,
     seedSampleData: env.DEMO_SEED_SAMPLE_DATA,
+    // Show the demo emails + passwords on the sign-in page (only ever applies while DEMO_MODE is on).
+    // Only DEMO_USER_PASSWORD / DEMO_ADMIN_PASSWORD are ever published — never other secrets.
+    showCredentials: env.DEMO_SHOW_CREDENTIALS,
     accounts: [
       {
         key: 'user1',
