@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment files — never commit real secrets
+.env
+.env.*
+!.env.example
+client/.env.local
+
+# Builds
+client/dist/
+dist/
+coverage/
+
+# Local uploads (development storage driver) and local database data
+server/uploads/
+server/.data/
+
+# Logs & OS / editor files
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp

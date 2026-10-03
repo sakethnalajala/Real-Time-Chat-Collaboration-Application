@@ -1,0 +1,46 @@
+# Render Blueprint — deploys the API (Express + Socket.IO) from /server.
+# Render → New → Blueprint → select this repository. Values marked `sync: false`
+# are prompted for during setup (they are secrets or deployment-specific URLs).
+services:
+  - type: web
+    name: nebula-chat-api
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: MONGODB_URI
+        sync: false # your Atlas Cluster0 connection string
+      - key: MONGODB_DB_NAME
+        value: real_time_chat # migrated database; never the default "test"
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: CLIENT_URL
+        sync: false # e.g. https://your-app.vercel.app
+      - key: CORS_ORIGINS
+        sync: false # optional extra origins (Vercel preview URLs), comma separated
+      - key: TRUST_PROXY
+        value: "2" # Vercel rewrite + Render proxy
+      - key: COOKIE_SAMESITE
+        value: lax
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # No email service: SMTP is intentionally not configured. Password resets use
+      # admin-created reset links (Admin → Users → user → Reset link).
+      - key: DEMO_MODE
+        value: "true"
+      - key: DEMO_USER_PASSWORD
+        sync: false
+      - key: DEMO_ADMIN_PASSWORD
+        sync: false
